@@ -1,0 +1,6 @@
+flask
+requests
+numpy
+werkzeug
+python-dotenv
+scikit-learn

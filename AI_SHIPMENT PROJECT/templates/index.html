@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Logistics Dashboard</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+  <style>
+    :root {
+      --brand: #2f3e9e;
+      --brand-2: #1e2c7a;
+      --bg: #f4f6fb;
+      --card: #ffffff;
+      --card-shadow: rgba(0, 0, 0, 0.12);
+      --text: #1f1f35;
+      --muted: #6b7280;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 64px;
+      background: linear-gradient(90deg, var(--brand), var(--brand-2));
+      color: white;
+      box-shadow: 0 6px 10px rgba(0, 0, 0, 0.08);
+      position: fixed;
+      width: 100%;
+      z-index: 20;
+    }
+
+    .topbar .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    .topbar .brand span {
+      font-size: 18px;
+    }
+
+    .topbar .user {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    .topbar .user button {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.12);
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 0;
+      padding-top: 64px;
+      min-height: calc(100vh - 64px);
+    }
+
+    .sidebar {
+      background: #1d2866;
+      padding: 28px 18px;
+      position: sticky;
+      top: 64px;
+      height: calc(100vh - 64px);
+      overflow: auto;
+    }
+
+    .sidebar h2 {
+      color: rgba(255, 255, 255, 0.88);
+      font-size: 18px;
+      margin-bottom: 18px;
+      letter-spacing: 0.02em;
+    }
+
+    .sidebar nav a {
+      display: block;
+      margin-bottom: 10px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.88);
+      transition: background 0.2s ease;
+    }
+
+    .sidebar nav a.active,
+    .sidebar nav a:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .main {
+      padding: 24px;
+      overflow: auto;
+    }
+
+    .section {
+      margin-bottom: 26px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 10px 18px var(--card-shadow);
+    }
+
+    .card h3 {
+      margin: 0 0 10px;
+      font-size: 16px;
+      color: var(--muted);
+    }
+
+    .card .card-value {
+      font-size: 28px;
+      font-weight: 700;
+      margin-top: 6px;
+      letter-spacing: 0.02em;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .form-grid .wide {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 6px;
+      color: #5b5b77;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #d9d9db;
+      font-size: 14px;
+      outline: none;
+      transition: border 0.2s ease;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(47, 62, 158, 0.16);
+    }
+
+    button.primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: none;
+      background: linear-gradient(90deg, var(--brand), var(--brand-2));
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    button.primary:hover {
+      transform: translateY(-1px);
+    }
+
+    .alert {
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+      background: rgba(47, 62, 158, 0.08);
+      border: 1px solid rgba(47, 62, 158, 0.15);
+      font-weight: 600;
+      color: #1e2c7a;
+    }
+
+    .prediction-metrics {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 16px;
+    }
+
+    .mini-card {
+      padding: 14px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #f9fbff, #eef3ff);
+      border: 1px solid rgba(47, 62, 158, 0.12);
+    }
+
+    .mini-card h4 {
+      margin: 0;
+      font-size: 13px;
+      color: #5b5b77;
+    }
+
+    .mini-card p {
+      margin: 8px 0 0;
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .brief-panel {
+      margin-top: 18px;
+      padding: 18px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #16245d, #24388e 52%, #3153b4);
+      color: white;
+      box-shadow: 0 18px 28px rgba(22, 36, 93, 0.24);
+    }
+
+    .brief-panel h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      color: white;
+    }
+
+    .brief-panel p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.88);
+      line-height: 1.55;
+    }
+
+    .brief-grid {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .brief-card {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 16px;
+      padding: 16px;
+      backdrop-filter: blur(8px);
+    }
+
+    .brief-card h4 {
+      margin: 0 0 12px;
+      font-size: 14px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.76);
+    }
+
+    .brief-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .brief-list li {
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .brief-list li:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .brief-list strong,
+    .impact-grid strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 4px;
+      color: white;
+    }
+
+    .brief-list span,
+    .impact-grid span {
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .risk-share {
+      display: inline-flex;
+      margin-top: 8px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      font-size: 12px;
+      font-weight: 700;
+      color: white;
+    }
+
+    .impact-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .impact-tile {
+      border-radius: 14px;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .risk-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.14);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .link-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: #eef3ff;
+      border: 1px solid rgba(47, 62, 158, 0.16);
+      color: #24388e;
+      font-weight: 700;
+    }
+
+    .link-button:hover {
+      background: #e4ebff;
+    }
+
+    .predict-note {
+      margin: 0 0 16px;
+      color: #51607b;
+      line-height: 1.5;
+    }
+
+    .context-strip {
+      margin-top: 18px;
+      padding: 16px;
+      border-radius: 16px;
+      background: #f7f9ff;
+      border: 1px solid rgba(47, 62, 158, 0.12);
+    }
+
+    .context-strip h4 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      color: #23327d;
+    }
+
+    .context-strip p {
+      margin: 0;
+      color: #51607b;
+      line-height: 1.5;
+    }
+
+    .context-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .context-chip {
+      border-radius: 14px;
+      padding: 12px;
+      background: white;
+      border: 1px solid rgba(47, 62, 158, 0.1);
+    }
+
+    .context-chip strong {
+      display: block;
+      font-size: 12px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: #5b5b77;
+    }
+
+    .context-chip span {
+      display: block;
+      margin-top: 6px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #1f1f35;
+    }
+
+    .context-chip small {
+      display: block;
+      margin-top: 4px;
+      color: #6d7690;
+      line-height: 1.4;
+    }
+
+    .chart-wrapper {
+      height: 320px;
+    }
+
+    #map {
+      width: 100%;
+      height: 340px;
+      border-radius: 16px;
+      box-shadow: 0 10px 18px var(--card-shadow);
+    }
+
+    .control-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    #droneCanvas {
+      width: 100%;
+      height: 280px;
+      background: radial-gradient(circle at top, #edf2ff, #d7e0ff 60%, #c9d7ff);
+      border-radius: 16px;
+      border: 1px solid rgba(32, 56, 145, 0.16);
+    }
+
+    #live3d {
+      width: 100%;
+      height: 320px;
+      border-radius: 16px;
+      border: 1px solid rgba(32, 56, 145, 0.2);
+      overflow: hidden;
+      background: radial-gradient(circle at top, #111c5a, #0a123d);
+    }
+
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(100px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .kpi-chip {
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(47, 62, 158, 0.08);
+      border: 1px solid rgba(47, 62, 158, 0.16);
+    }
+
+    .kpi-chip strong {
+      display: block;
+      font-size: 18px;
+      margin-top: 4px;
+    }
+
+    #aiDecisionList {
+      list-style: none;
+      margin: 12px 0 0;
+      padding: 0;
+    }
+
+    #aiDecisionList li {
+      margin-bottom: 12px;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #f6f8ff;
+      border: 1px solid rgba(27, 47, 127, 0.1);
+    }
+
+    #aiRisk {
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-weight: 700;
+      background: #ffe6e6;
+      color: #9a1919;
+    }
+
+    @media (max-width: 860px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: relative;
+        height: auto;
+        top: 0;
+      }
+
+      .topbar {
+        flex-wrap: wrap;
+        gap: 12px;
+        height: auto;
+        padding: 16px;
+      }
+
+      .main {
+        padding: 18px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <span>🚚 Logistics AI</span>
+    </div>
+    <div class="user">
+      <span>Welcome{{ ' ' + username if username else '' }}</span>
+      <form method="get" action="/logout" style="margin:0;">
+        <button type="submit">Logout</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <h2>Navigation</h2>
+      <nav>
+        <a href="/admin/dashboard" class="nav-link" id="nav-dashboard">Dashboard</a>
+        <a href="/admin/prediction" class="nav-link" id="nav-prediction">Prediction</a>
+        <a href="/admin/shipments" class="nav-link" id="nav-shipments">Shipments</a>
+        <a href="/admin/analytics" class="nav-link" id="nav-analytics">Analytics</a>
+        <a href="/admin/control" class="nav-link" id="nav-control">Control Center</a>
+        <a href="/admin/admin" class="nav-link" id="nav-admin">Admin</a>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <section id="dashboard" class="section">
+        <h2>Dashboard</h2>
+
+        <div class="cards">
+          <div class="card">
+            <h3>Total Shipments</h3>
+            <div class="card-value">{{ total_shipments }}</div>
+          </div>
+          <div class="card">
+            <h3>Delayed Shipments</h3>
+            <div class="card-value">{{ delayed_shipments }}</div>
+          </div>
+          <div class="card">
+            <h3>Active Trucks</h3>
+            <div class="card-value">{{ active_trucks }}</div>
+          </div>
+          <div class="card">
+            <h3>Delivery Success</h3>
+            <div class="card-value">{{ success_rate }}%</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="prediction" class="section">
+        <h2>Delay Predictor</h2>
+
+        {% if prediction_text %}
+        <div class="alert">{{ prediction_text }}</div>
+        {% endif %}
+
+        <div class="card">
+          <p class="predict-note">
+            Choose the route and departure hour. The app will fetch traffic-aware routing and live weather automatically,
+            then infer route condition instead of asking you to guess it manually.
+          </p>
+          <form action="/predict" method="post">
+            <div class="form-grid">
+              <div>
+                <label>Source City</label>
+                <select name="source_city">
+                  {% for city in city_options %}
+                  <option value="{{ city }}" {% if city == selected_source_city %}selected{% endif %}>{{ city }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div>
+                <label>Destination City</label>
+                <select name="destination_city">
+                  {% for city in city_options %}
+                  <option value="{{ city }}" {% if city == selected_destination_city %}selected{% endif %}>{{ city }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="wide">
+                <label>Departure Hour</label>
+                <input type="number" name="hour" min="0" max="23" value="{{ selected_hour if selected_hour is not none else '' }}" required />
+              </div>
+            </div>
+
+            <button type="submit" class="primary">Predict Delay</button>
+          </form>
+
+          {% if live_context %}
+          <div class="context-strip">
+            <h4>Auto-Fetched Route Context</h4>
+            <p><strong>{{ live_context.data_mode }}</strong> - {{ live_context.data_note }}</p>
+            <div class="context-grid">
+              <div class="context-chip">
+                <strong>Distance</strong>
+                <span>{{ live_context.distance_km }} km</span>
+                <small>Route length used for prediction</small>
+              </div>
+              <div class="context-chip">
+                <strong>Traffic</strong>
+                <span>{{ live_context.traffic_label }}</span>
+                <small>Derived from live routing delay</small>
+              </div>
+              <div class="context-chip">
+                <strong>Weather</strong>
+                <span>{{ live_context.weather_label }}</span>
+                <small>{{ live_context.weather_detail }}</small>
+              </div>
+              <div class="context-chip">
+                <strong>Route Condition</strong>
+                <span>{{ live_context.route_label }}</span>
+                <small>Inferred from routing friction and weather</small>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          {% if predicted_fuel_cost is not none or predicted_delivery_time is not none %}
+          <div class="prediction-metrics">
+            <div class="mini-card">
+              <h4>Predicted Fuel Cost</h4>
+              <p>Rs {{ predicted_fuel_cost }}</p>
+            </div>
+            <div class="mini-card">
+              <h4>Predicted Delivery Time</h4>
+              <p>{{ predicted_delivery_time }} hrs</p>
+            </div>
+            <div class="mini-card">
+              <h4>Traffic-Aware ETA</h4>
+              <p>{{ eta }} hrs</p>
+            </div>
+            <div class="mini-card">
+              <h4>Delay Probability</h4>
+              <p>{{ probability }}%</p>
+            </div>
+            <div class="mini-card">
+              <h4>Expected Arrival</h4>
+              <p style="font-size:18px;">{{ arrival_projection.arrival_label if arrival_projection else '--' }}</p>
+            </div>
+          </div>
+          {% endif %}
+
+          {% if prediction_summary %}
+          <div class="brief-panel">
+            <h3>AI Operations Brief</h3>
+            <p>{{ prediction_summary }}</p>
+
+            <div class="brief-grid">
+              <div class="brief-card">
+                <h4>Top Delay Drivers</h4>
+                <ul class="brief-list">
+                  {% for factor in prediction_explanation %}
+                  <li>
+                    <strong>{{ factor.title }}</strong>
+                    <span>{{ factor.detail }}</span>
+                    <div class="risk-share">{{ factor.share }}% of current risk profile</div>
+                  </li>
+                  {% endfor %}
+                </ul>
+              </div>
+
+              <div class="brief-card">
+                <h4>Recommended Actions</h4>
+                <ul class="brief-list">
+                  {% for action in recommended_actions %}
+                  <li>
+                    <strong>Action {{ loop.index }}</strong>
+                    <span>{{ action }}</span>
+                  </li>
+                  {% endfor %}
+                </ul>
+              </div>
+
+              <div class="brief-card">
+                <h4>Cost Impact</h4>
+                <div class="impact-grid">
+                  <div class="impact-tile">
+                    <strong>Extra fuel burn</strong>
+                    <span>Rs {{ cost_impact.extra_fuel_cost }}</span>
+                  </div>
+                  <div class="impact-tile">
+                    <strong>Delay overrun</strong>
+                    <span>{{ cost_impact.delay_hours }} hrs</span>
+                  </div>
+                  <div class="impact-tile">
+                    <strong>Delay cost</strong>
+                    <span>Rs {{ cost_impact.delay_cost }}</span>
+                  </div>
+                  <div class="impact-tile">
+                    <strong>Total exposure</strong>
+                    <span>Rs {{ cost_impact.total_exposure }}</span>
+                  </div>
+                </div>
+                <div class="risk-pill">SLA Risk: {{ cost_impact.sla_risk }}</div>
+              </div>
+            </div>
+
+            <div class="action-row">
+              <a href="/export_prediction_report" class="link-button">Download Prediction Report</a>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </section>
+
+      <section id="shipments" class="section">
+        <h2>Shipment Tracking</h2>
+        <div class="cards">
+          <div class="card" style="min-height: 320px;">
+            <h3>Live Truck Map</h3>
+            <div id="map"></div>
+          </div>
+
+          <div class="card" style="min-height: 360px;">
+            <h3>Recent Shipments</h3>
+            <div class="action-row" style="margin-top:0; margin-bottom:14px;">
+              <a href="/export_shipments" class="link-button">Download Shipment CSV</a>
+              <a href="/export_summary_report" class="link-button">Download Ops Summary</a>
+            </div>
+            <form action="/add_shipment" method="post" style="margin-bottom:18px;">
+              <div class="form-grid">
+                <div>
+                  <label>Shipment ID</label>
+                  <input type="text" name="shipment_id" placeholder="SHP123" required />
+                </div>
+                <div>
+                  <label>Location</label>
+                  <input type="text" name="location" placeholder="City" required />
+                </div>
+                <div class="wide">
+                  <label>Status</label>
+                  <select name="status">
+                    <option value="In Transit">In Transit</option>
+                    <option value="Delayed">Delayed</option>
+                    <option value="Delivered">Delivered</option>
+                  </select>
+                </div>
+              </div>
+              <button type="submit" class="primary" style="margin-top:12px;">Add Shipment</button>
+            </form>
+
+            <table style="width:100%; border-collapse: collapse;">
+              <thead>
+                <tr>
+                  <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(0,0,0,0.08);">ID</th>
+                  <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(0,0,0,0.08);">Status</th>
+                  <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(0,0,0,0.08);">Location</th>
+                  <th style="text-align:right; padding:10px; border-bottom:1px solid rgba(0,0,0,0.08);">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for s in shipments %}
+                <tr>
+                  <td style="padding:10px;">{{ s[0] }}</td>
+                  <td style="padding:10px;">{{ s[1] }}</td>
+                  <td style="padding:10px;">{{ s[2] }}</td>
+                  <td style="padding:10px; text-align:right;"><a href="/delete/{{ s[0] }}" style="color:#d14444; font-weight:600;">Delete</a></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="analytics" class="section">
+        <h2>Analytics</h2>
+
+        <div class="cards">
+          <div class="card chart-wrapper">
+            <canvas id="delayChart"></canvas>
+          </div>
+
+          <div class="card">
+            <h3>Latest Metrics</h3>
+            <div class="cards" style="grid-template-columns: repeat(2, 1fr);">
+              <div class="card" style="padding:12px;">
+                <h4>Total</h4>
+                <p class="card-value" id="metric-total">{{ total_shipments }}</p>
+              </div>
+              <div class="card" style="padding:12px;">
+                <h4>Delayed</h4>
+                <p class="card-value" id="metric-delayed">{{ delayed_shipments }}</p>
+              </div>
+              <div class="card" style="padding:12px;">
+                <h4>Active</h4>
+                <p class="card-value" id="metric-active">{{ active_trucks }}</p>
+              </div>
+              <div class="card" style="padding:12px;">
+                <h4>Success</h4>
+                <p class="card-value" id="metric-success">{{ success_rate }}%</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="control" class="section">
+        <h2>Live Control Center</h2>
+        <div class="control-grid">
+          <div class="card">
+            <h3>Drone Delivery Simulation</h3>
+            <canvas id="droneCanvas" width="700" height="280"></canvas>
+            <div class="kpi-strip">
+              <div class="kpi-chip">
+                Active Drones
+                <strong id="drone-active">0</strong>
+              </div>
+              <div class="kpi-chip">
+                Avg Battery
+                <strong id="drone-battery">0%</strong>
+              </div>
+              <div class="kpi-chip">
+                Deliveries/Hr
+                <strong id="drone-throughput">0</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>AI Logistics Decision Engine</h3>
+            <div id="aiRisk">Risk: --</div>
+            <p style="margin: 12px 0 0;">Projected on-time performance: <strong id="onTimeProjection">--%</strong></p>
+            <ul id="aiDecisionList"></ul>
+          </div>
+
+          <div class="card">
+            <h3>3D Live Logistics Center</h3>
+            <div id="live3d"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="admin" class="section">
+        <h2>Admin Panel</h2>
+        <div class="card">
+          <h3>Manage Users</h3>
+
+          {% if retrain_message %}
+          <div class="alert">{{ retrain_message }}</div>
+          {% endif %}
+
+          <form action="/add_user" method="post" style="margin-top:16px;">
+            <div class="form-grid">
+              <div>
+                <label>Username</label>
+                <input type="text" name="username" placeholder="Username" required />
+              </div>
+              <div>
+                <label>Password</label>
+                <input type="password" name="password" placeholder="Password" required />
+              </div>
+            </div>
+            <button type="submit" class="primary">Create / Update User</button>
+          </form>
+
+          {% if users %}
+          <div style="margin-top:18px;">
+            <h4>Existing users</h4>
+            <ul style="padding-left:16px;">
+              {% for u in users %}
+              <li style="margin:6px 0; display:flex; justify-content:space-between; align-items:center;">
+                <span>{{ u }}</span>
+                {% if u != 'admin' %}
+                <a href="/delete_user/{{ u }}" style="color:#d14444; font-weight:600;">Delete</a>
+                {% else %}
+                <span style="color:#999; font-size:12px;">system</span>
+                {% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+
+          <form action="/retrain_model" method="post" style="margin-top:22px;">
+            <button type="submit" class="primary">Retrain Model</button>
+          </form>
+
+          {% if model_accuracy is not none %}
+          <div style="margin-top:16px; padding:12px; border-radius:12px; background: rgba(15, 30, 80, 0.08);">
+            <strong>Current model accuracy:</strong> {{ (model_accuracy * 100) | round(2) }}%
+          </div>
+          {% endif %}
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const activeSection = "{{ active_section|default('dashboard') }}";
+    let latestTelemetry = null;
+    let chart;
+    let threeState = null;
+
+    function scrollToSection(section) {
+      if (!section) return;
+      const el = document.getElementById(section);
+      if (el) {
+        window.scrollTo({ top: el.offsetTop - 90, behavior: 'smooth' });
+      }
+    }
+
+    function highlightNav(section) {
+      document.querySelectorAll('.sidebar a.nav-link').forEach((a) => a.classList.remove('active'));
+      const el = document.getElementById('nav-' + section);
+      if (el) el.classList.add('active');
+    }
+
+    function initThree() {
+      const host = document.getElementById('live3d');
+      if (!host || !window.THREE || threeState) return;
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(58, host.clientWidth / host.clientHeight, 0.1, 1000);
+      camera.position.set(0, 28, 35);
+      camera.lookAt(0, 0, 0);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(host.clientWidth, host.clientHeight);
+      host.appendChild(renderer.domElement);
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+      const keyLight = new THREE.DirectionalLight(0x9db4ff, 1.2);
+      keyLight.position.set(18, 30, 24);
+      scene.add(keyLight);
+
+      const floor = new THREE.Mesh(
+        new THREE.PlaneGeometry(54, 54),
+        new THREE.MeshStandardMaterial({ color: 0x112566, roughness: 0.85 })
+      );
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = -1;
+      scene.add(floor);
+
+      threeState = { scene, camera, renderer, hubs: {}, drones: {} };
+
+      window.addEventListener('resize', () => {
+        if (!threeState) return;
+        const width = host.clientWidth;
+        const height = host.clientHeight;
+        threeState.renderer.setSize(width, height);
+        threeState.camera.aspect = width / height;
+        threeState.camera.updateProjectionMatrix();
+      });
+
+      function animate() {
+        if (!threeState) return;
+        Object.values(threeState.drones).forEach((drone) => {
+          drone.rotation.y += 0.03;
+        });
+        threeState.renderer.render(threeState.scene, threeState.camera);
+        requestAnimationFrame(animate);
+      }
+      animate();
+    }
+
+    function drawDroneSimulation(telemetry) {
+      const canvas = document.getElementById('droneCanvas');
+      if (!canvas || !telemetry) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+
+      const lats = telemetry.hubs.map((hub) => hub.lat);
+      const lngs = telemetry.hubs.map((hub) => hub.lng);
+      const minLat = Math.min(...lats) - 1;
+      const maxLat = Math.max(...lats) + 1;
+      const minLng = Math.min(...lngs) - 1;
+      const maxLng = Math.max(...lngs) + 1;
+
+      function project(lat, lng) {
+        const x = ((lng - minLng) / (maxLng - minLng)) * (w - 70) + 35;
+        const y = h - (((lat - minLat) / (maxLat - minLat)) * (h - 60) + 30);
+        return [x, y];
+      }
+
+      ctx.clearRect(0, 0, w, h);
+
+      telemetry.lanes.forEach((lane) => {
+        const from = telemetry.hubs.find((hub) => hub.id === lane.from);
+        const to = telemetry.hubs.find((hub) => hub.id === lane.to);
+        if (!from || !to) return;
+        const [x1, y1] = project(from.lat, from.lng);
+        const [x2, y2] = project(to.lat, to.lng);
+        ctx.strokeStyle = 'rgba(39, 69, 172, 0.32)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      });
+
+      telemetry.hubs.forEach((hub) => {
+        const [x, y] = project(hub.lat, hub.lng);
+        ctx.fillStyle = '#1f2f7f';
+        ctx.beginPath();
+        ctx.arc(x, y, 9, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#0f173f';
+        ctx.font = 'bold 12px Segoe UI';
+        ctx.fillText(hub.name, x + 12, y + 4);
+      });
+
+      telemetry.drones.forEach((drone) => {
+        const [x, y] = project(drone.lat, drone.lng);
+        ctx.fillStyle = drone.battery < 35 ? '#d32f2f' : '#11885f';
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#17214f';
+        ctx.font = '11px Segoe UI';
+        ctx.fillText(drone.id, x + 9, y - 8);
+      });
+    }
+
+    function syncThree(telemetry) {
+      if (!threeState || !telemetry) return;
+      const { scene } = threeState;
+
+      function project(lat, lng) {
+        return {
+          x: (lng - 80) * 1.2,
+          z: (lat - 23) * 1.1,
+        };
+      }
+
+      telemetry.hubs.forEach((hub) => {
+        const key = hub.id;
+        if (!threeState.hubs[key]) {
+          const mesh = new THREE.Mesh(
+            new THREE.BoxGeometry(2.4, 2.4, 2.4),
+            new THREE.MeshStandardMaterial({ color: 0x7cb9ff })
+          );
+          scene.add(mesh);
+          threeState.hubs[key] = mesh;
+        }
+        const p = project(hub.lat, hub.lng);
+        threeState.hubs[key].position.set(p.x, 0.8, p.z);
+      });
+
+      telemetry.drones.forEach((drone) => {
+        const key = drone.id;
+        if (!threeState.drones[key]) {
+          const droneMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(0.55, 14, 14),
+            new THREE.MeshStandardMaterial({ color: drone.battery < 35 ? 0xff7862 : 0x57f0b4 })
+          );
+          scene.add(droneMesh);
+          threeState.drones[key] = droneMesh;
+        }
+        const p = project(drone.lat, drone.lng);
+        threeState.drones[key].position.set(p.x, 3.2 + (drone.eta_minutes % 4) * 0.15, p.z);
+      });
+    }
+
+    async function loadAnalytics() {
+      const res = await fetch('/analytics');
+      const data = await res.json();
+
+      document.getElementById('metric-total').textContent = data.total;
+      document.getElementById('metric-delayed').textContent = data.delayed;
+      document.getElementById('metric-active').textContent = data.active;
+      document.getElementById('metric-success').textContent = `${data.success}%`;
+
+      const ctx = document.getElementById('delayChart');
+      if (chart) chart.destroy();
+
+      chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Total', 'Delayed', 'Active', 'Success %'],
+          datasets: [
+            {
+              label: 'Current Metrics',
+              data: [data.total, data.delayed, data.active, data.success],
+              backgroundColor: ['#3b82f6', '#ef4444', '#10b981', '#f97316'],
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+          },
+        },
+      });
+    }
+
+    async function loadDroneTelemetry() {
+      try {
+        const res = await fetch('/drone_telemetry');
+        if (!res.ok) return;
+        latestTelemetry = await res.json();
+        drawDroneSimulation(latestTelemetry);
+        syncThree(latestTelemetry);
+        document.getElementById('drone-active').textContent = latestTelemetry.summary.active_drones;
+        document.getElementById('drone-battery').textContent = `${latestTelemetry.summary.avg_battery}%`;
+        document.getElementById('drone-throughput').textContent = latestTelemetry.summary.deliveries_per_hour;
+      } catch (error) {
+        // ignore refresh errors during transient network hiccups
+      }
+    }
+
+    async function loadAIDecisions() {
+      try {
+        const res = await fetch('/ai_decisions');
+        if (!res.ok) return;
+        const data = await res.json();
+        const riskNode = document.getElementById('aiRisk');
+        const decisionList = document.getElementById('aiDecisionList');
+        const onTimeNode = document.getElementById('onTimeProjection');
+        if (!riskNode || !decisionList || !onTimeNode) return;
+
+        riskNode.textContent = `Risk: ${data.risk_score}/100`;
+        if (data.risk_score >= 65) {
+          riskNode.style.background = '#ffe6e6';
+          riskNode.style.color = '#9a1919';
+        } else if (data.risk_score >= 40) {
+          riskNode.style.background = '#fff7dd';
+          riskNode.style.color = '#996f00';
+        } else {
+          riskNode.style.background = '#e8fcef';
+          riskNode.style.color = '#0d7137';
+        }
+        onTimeNode.textContent = `${data.on_time_projection}%`;
+
+        decisionList.innerHTML = '';
+        data.decisions.forEach((decision) => {
+          const li = document.createElement('li');
+          li.innerHTML = `<strong>${decision.title}:</strong> ${decision.action}<br><span style="color:#51608f;">${decision.impact}</span>`;
+          decisionList.appendChild(li);
+        });
+      } catch (error) {
+        // ignore refresh errors during transient network hiccups
+      }
+    }
+
+    const map = L.map('map').setView([20.2961, 85.8245], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+    }).addTo(map);
+
+    const truckIcon = L.icon({
+      iconUrl: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='6' y='20' width='31' height='20' rx='4' fill='%231f5fbf'/%3E%3Cpath d='M37 25h10l7 8v7H37z' fill='%233a86ff'/%3E%3Crect x='43' y='28' width='7' height='6' rx='1' fill='%23dff3ff'/%3E%3Ccircle cx='20' cy='44' r='6' fill='%23222'/%3E%3Ccircle cx='47' cy='44' r='6' fill='%23222'/%3E%3Ccircle cx='20' cy='44' r='2.5' fill='%23fff'/%3E%3Ccircle cx='47' cy='44' r='2.5' fill='%23fff'/%3E%3Crect x='10' y='24' width='14' height='6' rx='2' fill='%23dff3ff'/%3E%3Cpath d='M8 18h18l3 3H5z' fill='%23ff9f1c'/%3E%3C/svg%3E",
+      iconSize: [40, 40],
+    });
+
+    const markers = {};
+
+    async function refreshTrucks() {
+      const res = await fetch('/truck_location');
+      const data = await res.json();
+
+      Object.entries(data).forEach(([truck, coords]) => {
+        const latLng = [coords.lat, coords.lng];
+        if (!markers[truck]) {
+          markers[truck] = L.marker(latLng, { icon: truckIcon }).addTo(map);
+        } else {
+          markers[truck].setLatLng(latLng);
+        }
+      });
+    }
+
+    if (activeSection) {
+      scrollToSection(activeSection);
+      highlightNav(activeSection);
+    }
+
+    initThree();
+    loadAnalytics();
+    loadDroneTelemetry();
+    loadAIDecisions();
+    refreshTrucks();
+    setInterval(loadAnalytics, 6000);
+    setInterval(refreshTrucks, 1800);
+    setInterval(loadDroneTelemetry, 2200);
+    setInterval(loadAIDecisions, 3000);
+  </script>
+</body>
+
+</html>
